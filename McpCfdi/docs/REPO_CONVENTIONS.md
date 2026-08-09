@@ -1,169 +1,86 @@
 # Repository Conventions
 
-## Commit Messages
+This document defines the polyrepo naming convention and commit message format for all repositories on the platform.
 
-This project follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+---
+
+## Polyrepo Naming Convention
+
+Every service, frontend, and infrastructure repository follows a consistent naming scheme.
+
+| Repository type       | Naming pattern       | Example              |
+|-----------------------|----------------------|----------------------|
+| Service repository    | `<service>-service`  | `{service-name}-service`     |
+| Frontend repository   | `frontend`           | `frontend`           |
+| Infrastructure repository | `platform-infra` | `platform-infra`     |
+
+### Required Top-Level Folders
+
+Each repository MUST contain the following top-level directories:
+
+```
+<repo-root>/
+├── src/          # Application source code
+├── tests/        # Unit, integration, and property-based tests
+├── .github/      # GitHub Actions workflows, CODEOWNERS, PR templates
+└── docs/         # Architecture Decision Records, runbooks, API docs
+```
+
+---
+
+## Conventional Commits
+
+Every commit message MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) format.
 
 ### Format
 
 ```
-<type>(<scope>): <short description>
-
-[optional body]
-
-[optional footer(s)]
+<type>(<scope>): <description>
 ```
 
-### Types
+- **type** — the category of change (see table below)
+- **scope** — the area of the codebase affected (e.g., `{entity}`, `money`, `deps`)
+- **description** — a concise summary in imperative mood, lowercase, no trailing period
 
-| Type | Description |
-|------|-------------|
-| `feat` | A new feature |
-| `fix` | A bug fix |
-| `docs` | Documentation-only changes |
-| `style` | Code style changes (formatting, whitespace) that do not affect logic |
-| `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `perf` | Performance improvement |
-| `test` | Adding or updating tests |
-| `build` | Changes to build system or dependencies |
-| `ci` | Changes to CI/CD configuration |
-| `chore` | Maintenance tasks (tooling, config, no production code) |
-| `revert` | Reverts a previous commit |
+### Commit Types
 
-### Scopes
-
-Use the project layer or module as scope:
-
-- `domain` — Changes in McpCfdi.Domain
-- `application` — Changes in McpCfdi.Application
-- `infrastructure` — Changes in McpCfdi.Infrastructure
-- `api` — Changes in McpCfdi.Api
-- `tests` — Changes across test projects
-- `docs` — Documentation changes
-- `docker` — Dockerfile or container configuration
-- `deps` — Dependency updates
+| Type       | When to use                                      |
+|------------|--------------------------------------------------|
+| `feat`     | A new feature or user-facing capability           |
+| `fix`      | A bug fix                                         |
+| `docs`     | Documentation-only changes                        |
+| `style`    | Formatting, whitespace (no logic change)          |
+| `refactor` | Code restructuring without behavior change        |
+| `perf`     | Performance improvement                           |
+| `test`     | Adding or updating tests                          |
+| `chore`    | Tooling, CI, dependencies, maintenance            |
+| `ci`       | CI/CD pipeline changes                            |
+| `build`    | Build system or external dependency changes       |
 
 ### Examples
 
 ```
-feat(domain): add Comprobante aggregate with factory method
-fix(application): correct decimal rounding in tax calculations
-docs: update README with project summary
-refactor(infrastructure): extract outbox logic to dedicated service
-test(domain): add property-based tests for MontoMoneda value object
-build(deps): bump MediatR to 12.4.1
-ci: add GitHub Actions build workflow
+feat({entity}): add cancellation endpoint
+fix(money): handle zero-amount edge case
+chore(deps): update EF Core to 8.0.x
+docs(adr): add ADR-006 for caching strategy
+test(domain): add property tests for Money addition
 ```
 
-## Branch Strategy
+### Breaking Changes
 
-### Branch Naming
-
-```
-<type>/<short-description>
-```
-
-Examples:
-
-- `feat/generar-cfdi-command`
-- `fix/rfc-validation-regex`
-- `docs/add-adr-records`
-- `refactor/extract-catalog-service`
-
-### Rules
-
-- `main` is the stable branch. Never push directly to `main`.
-- All changes go through pull requests.
-- Branches are deleted after merging.
-
-## Pull Requests
-
-### Title
-
-Follow the same Conventional Commits format as commit messages:
+Breaking changes MUST include a `BREAKING CHANGE:` footer in the commit body. The footer explains what changed and what consumers need to do.
 
 ```
-feat(domain): add Emisor and Receptor entities
+feat({entity}): change {entity} ID from int to UUID
+
+BREAKING CHANGE: {Entity} IDs are now UUIDs. All API consumers must update
+their client code to send and receive string-based IDs instead of integers.
+Existing {entities} will be migrated with new UUID identifiers.
 ```
 
-### Description Template
+When a breaking change is introduced, the commit type line MAY also append `!` after the scope for additional visibility:
 
-```markdown
-## Summary
-Brief description of what this PR does.
-
-## Changes
-- Change 1
-- Change 2
-
-## Testing
-How was this tested? (unit tests, manual, integration)
-
-## Notes
-Any additional context, breaking changes, or follow-up work.
 ```
-
-### Rules
-
-- Keep PRs focused on a single concern.
-- Link related issues using `Closes #123` or `Relates to #456`.
-- Ensure all checks pass before requesting review.
-- Squash-merge to keep `main` history clean.
-
-## Code Style
-
-### C# Conventions
-
-- Follow Microsoft's [C# coding conventions](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions).
-- Use `nullable` reference types (enabled globally via `Directory.Build.props`).
-- Treat all warnings as errors (`TreatWarningsAsErrors` enabled).
-- Use file-scoped namespaces.
-- Use `sealed` on classes that are not designed for inheritance.
-- Prefer records for DTOs and value objects where appropriate.
-
-### Naming
-
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Namespace | PascalCase matching folder path | `McpCfdi.Domain.Entities` |
-| Class / Record | PascalCase | `GenerarCfdiCommandHandler` |
-| Interface | `I` prefix + PascalCase | `ICatalogoSatService` |
-| Method | PascalCase | `CalcularTotales` |
-| Property | PascalCase | `LugarExpedicion` |
-| Private field | `_camelCase` | `_catalogoService` |
-| Local variable | camelCase | `decimalesMoneda` |
-| Constant | PascalCase | `RfcMoralPattern` |
-
-### Project Organization
-
-- One class per file (exceptions: nested private types, closely related records).
-- File name matches the primary type name.
-- Follow Clean Architecture dependency rule: inner layers never reference outer layers.
-
-## Issues
-
-### Labels
-
-| Label | Purpose |
-|-------|---------|
-| `bug` | Something isn't working |
-| `feature` | New feature request |
-| `enhancement` | Improvement to existing functionality |
-| `documentation` | Documentation updates |
-| `question` | Needs discussion or clarification |
-| `good first issue` | Simple tasks for new contributors |
-
-### Issue Title
-
-Use a clear, concise title that describes the problem or feature:
-
-- Good: "RFC validation rejects valid persona moral format"
-- Bad: "Fix bug"
-
-## Versioning
-
-This project uses [Semantic Versioning](https://semver.org/):
-
-- **MAJOR** — Breaking changes to the MCP tool contract or public API.
-- **MINOR** — New features (e.g., new CFDI types, new MCP tools) that are backward-compatible.
-- **PATCH** — Bug fixes and minor improvements.
+feat({entity})!: change {entity} ID from int to UUID
+```

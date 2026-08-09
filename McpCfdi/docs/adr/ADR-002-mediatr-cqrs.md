@@ -1,50 +1,54 @@
-# ADR-002: MediatR for CQRS
+# ADR-002: Choice of MediatR for CQRS
 
 ## Status
 
 Accepted
 
-## Date
-
-2025-01-15
-
 ## Context
 
-The CFDI generation flow involves orchestrating multiple steps: domain model construction, total calculations, XML serialization, cadena original generation, and digital signing. We need a way to:
+The application layer needs a mechanism to decouple API endpoints from business logic handlers. Specifically:
 
-- Separate command handling from API/transport concerns.
-- Apply cross-cutting behaviours (logging, validation) uniformly without polluting handlers.
-- Keep handlers focused on a single responsibility.
+- **Command/Query Responsibility Segregation (CQRS)**: Write operations (commands) and read operations (queries) have different performance profiles, validation needs, and side effects. Treating them uniformly leads to bloated service classes.
+- **Cross-cutting concerns**: Logging, validation, performance tracking, and transaction management need to be applied consistently across all handlers without duplicating code in each one.
+- **Testability**: Handlers must be independently testable with mocked dependencies, without needing the full ASP.NET Core pipeline.
+- **Single Responsibility**: Each handler should do exactly one thing — process one command or answer one query.
+
+Alternatives considered:
+- **Direct service injection**: Simple but leads to large service classes violating SRP, and cross-cutting concerns must be manually applied.
+- **Custom mediator**: Full control but significant maintenance overhead and reinvention of well-solved patterns.
+- **Wolverine**: More opinionated and tightly coupled to its own hosting model.
 
 ## Decision
 
-Use **MediatR 12.4.1** as an in-process mediator implementing the CQRS pattern:
+We adopt **MediatR** as the in-process mediator for dispatching commands and queries in the Application layer. The implementation follows these conventions:
 
-- **Commands** (e.g., `GenerarCfdiCommand`) represent write intentions and return results.
-- **Queries** represent read intentions (to be added as the project evolves).
-- **Pipeline Behaviours** provide cross-cutting concerns that execute before/after every handler.
+- **Commands** implement `IRequest<TResponse>` (e.g., `Place{Entity}Command : IRequest<Guid>`). Commands represent intent to change state.
+- **Queries** implement `IRequest<TResponse>` (e.g., `Get{Entity}Query : IRequest<{Entity}Dto?>`). Queries are side-effect-free reads.
+- **Handlers** implement `IRequestHandler<TRequest, TResponse>` with a single `Handle` method.
+- **Pipeline Behaviours** implement `IPipelineBehavior<TRequest, TResponse>` and are registered in order:
+  1. `LoggingBehaviour` (outermost) — logs request name and elapsed time at `Information` level.
+  2. `ValidationBehaviour` (innermost, before handler) — runs all registered `IValidator<TRequest>` instances via FluentValidation; throws `ValidationException` if any failures, preventing handler execution.
 
-Registered pipeline behaviours (in order):
+Registration in `Program.cs`:
+```csharp
+services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Place{Entity}Handler>());
+services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehaviour<,>));
+services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehaviour<,>));
+```
 
-1. `LoggingBehaviour<TRequest, TResponse>` — logs request name before and after handling.
-2. `ValidationBehaviour<TRequest, TResponse>` — runs all registered FluentValidation validators; throws `ValidationException` on failure.
-
-MediatR services are auto-registered from the Application assembly.
+API endpoints dispatch via `ISender.Send(command)` — they never reference handlers directly.
 
 ## Consequences
 
 ### Positive
 
-- Handlers are single-responsibility: `GenerarCfdiCommandHandler` orchestrates CFDI generation without worrying about logging or validation.
-- Adding new cross-cutting concerns (e.g., caching, metrics, authorization) requires only a new `IPipelineBehavior<,>` implementation.
-- Clear separation between "what to do" (command) and "how to do it" (handler).
+- **Thin endpoints**: API endpoints contain only request mapping and `ISender.Send()` — all logic lives in testable handlers.
+- **Uniform cross-cutting behaviour**: Logging and validation are applied to every command/query automatically via the pipeline, eliminating per-handler boilerplate.
+- **Handler isolation**: Each handler has a single responsibility and can be tested in isolation with Moq-based mocks for repositories and publishers.
+- **Discoverability**: The `IRequest`/`IRequestHandler` convention makes it easy to find all commands, queries, and their handlers via IDE navigation.
 
 ### Negative
 
-- Adds a layer of indirection — you can't navigate directly from the API to business logic without understanding the mediator pattern.
-- Pipeline behaviours run for all requests; fine-grained control requires conditional logic inside the behaviour.
-
-### Mitigations
-
-- Consistent naming convention: `XxxCommand` → `XxxCommandHandler` → `XxxCommandValidator`.
-- Pipeline behaviours are registered in explicit order in `Program.cs`.
+- **Implicit dispatch**: The mediator hides the direct call path from endpoint to handler, which can make debugging and "Find All References" less straightforward for newcomers.
+- **Runtime resolution**: Handler resolution is DI-based at runtime; misconfigured registrations produce runtime errors rather than compile-time failures.
+- **Single-process constraint**: MediatR is in-process only. Cross-service communication still requires a message broker (see ADR-003).
