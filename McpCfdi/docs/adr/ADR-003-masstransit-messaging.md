@@ -1,48 +1,44 @@
-# ADR-003: MassTransit for Async Messaging
+# ADR-003: Adoption of MassTransit for Messaging Abstraction
 
 ## Status
 
 Accepted
 
-## Date
-
-2025-01-15
-
 ## Context
 
-The system raises domain events (e.g., when a CFDI is generated). These events need to be published to downstream bounded contexts (Notifications, Identity) without coupling the core domain to specific transport mechanisms.
+The platform follows a microservices architecture with bounded contexts (Identity, {Entity} Service, Notifications) that need to communicate asynchronously. Key requirements:
 
-We need:
+- **Loose coupling**: Services must not take direct dependencies on each other's APIs for event-driven workflows (e.g., Notifications needs to react to `{Entity}PlacedEvent` without the {Entity} service knowing about Notifications).
+- **Transport portability**: The platform runs on both AWS (SNS/SQS) and Azure (Service Bus). The messaging code should not be rewritten for each cloud provider.
+- **Reliability**: Messages must not be lost during transient broker outages. The system must support at-least-once delivery with idempotent consumers.
+- **Local development**: Engineers need to run the full event-driven flow locally without cloud accounts, using RabbitMQ in Docker.
 
-- A transport-agnostic abstraction for publishing events.
-- Support for multiple transports (InMemory for development, RabbitMQ for production).
-- Reliable delivery guarantees when paired with the transactional outbox.
+Alternatives considered:
+- **Raw RabbitMQ.Client / Azure.Messaging.ServiceBus**: Maximum control but requires implementing serialization, retry policies, dead-letter handling, and consumer lifecycle management manually for each transport.
+- **NServiceBus**: Mature but commercially licensed, adding cost friction for open-source reference material.
+- **Dapr Pub/Sub**: Cloud-native but introduces a sidecar dependency and additional operational complexity.
 
 ## Decision
 
-Use **MassTransit 8.2.5** as the messaging abstraction:
+We adopt **MassTransit** as the messaging abstraction layer for all inter-service asynchronous communication. The implementation:
 
-- `IPublishEndpoint` is used to publish domain events.
-- `MassTransitEventPublisher` implements the application-layer `IApplicationEventPublisher` interface, publishing domain events through MassTransit's publish endpoint.
-- Transport is configured in `Program.cs`:
-  - **Development**: InMemory transport for fast local feedback.
-  - **Production**: RabbitMQ (configurable via connection string).
+- **Transport configuration**: In local development and Docker Compose, MassTransit is configured with the **RabbitMQ** transport (`cfg.UsingRabbitMq`) with connection settings from `RabbitMq:Host`, `RabbitMq:Username`, and `RabbitMq:Password` configuration. Consumer retry is configured with exponential backoff (3 retries, 1s→8s). Failed messages are moved to a dead-letter queue (`_error` suffix). When `RabbitMq:Host` is not configured (e.g., running locally without Docker), MassTransit falls back to the **InMemory** transport with a logged warning. In production, the transport can be swapped to AWS SQS/SNS or Azure Service Bus — no consumer code changes required.
+- **Event publishing**: The `MassTransitEventPublisher` class implements `IApplicationEventPublisher` (defined in the Application layer) by delegating to `IPublishEndpoint.Publish`. This keeps the Application layer transport-agnostic.
+- **Consumer implementation**: `{Entity}PlacedConsumer` implements `IConsumer<{Entity}PlacedEvent>` and is auto-discovered via assembly scanning. Each consumer processes one event type.
+- **Integration with Outbox**: MassTransit publishes events dispatched by the `OutboxProcessor` background service (see ADR-004), ensuring events are only published after successful persistence.
+- **Docker Compose**: RabbitMQ 3.13 runs as a service with healthchecks; the API depends on it with `condition: service_healthy`.
 
 ## Consequences
 
 ### Positive
 
-- Domain and Application layers are completely transport-agnostic — they only know about `IApplicationEventPublisher`.
-- Switching from InMemory to RabbitMQ requires only a configuration change in the composition root.
-- MassTransit provides consumer retry, error queues, and message serialization out of the box.
-- Integration with the transactional outbox ensures events are not lost even if the message broker is temporarily unavailable.
+- **Transport abstraction**: Switching from RabbitMQ (local) to SQS/SNS (AWS) or Service Bus (Azure) requires only configuration changes, not code changes.
+- **Convention-based setup**: MassTransit auto-configures exchanges, queues, and subscriptions based on message type names, reducing boilerplate.
+- **Built-in resilience**: Retry policies, circuit breakers, and dead-letter queues are configured declaratively.
+- **Local-first development**: Engineers spin up `docker-compose up` and get a fully functional message broker without cloud credentials.
 
 ### Negative
 
-- MassTransit adds complexity compared to a simple `IEventBus` with manual RabbitMQ client.
-- InMemory transport does not replicate all production behaviors (no network failures, no message persistence).
-
-### Mitigations
-
-- Integration tests can use the InMemory transport for speed.
-- Contract tests validate message schemas between producer and consumer.
+- **Abstraction cost**: MassTransit's conventions (exchange naming, topology creation) can be opaque and surprising when debugging message routing issues.
+- **Version coupling**: Major MassTransit upgrades occasionally introduce breaking changes to transport configuration APIs.
+- **Learning curve**: Engineers must understand both MassTransit concepts (sagas, consumers, middleware) and the underlying broker semantics for production debugging.

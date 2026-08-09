@@ -1,54 +1,42 @@
-# ADR-001: Clean Architecture as Structural Foundation
+# ADR-001: Adoption of Clean Architecture
 
 ## Status
 
 Accepted
 
-## Date
-
-2025-01-15
-
 ## Context
 
-We need an architecture that:
+The enterprise platform requires a long-lived, maintainable architecture that supports multiple teams working in parallel across different layers of the system. Key concerns include:
 
-- Isolates business logic from infrastructure concerns (database, messaging, HTTP).
-- Allows independent testability of each layer without requiring external services.
-- Enables swapping infrastructure components (e.g., changing the database provider or message broker) without modifying domain or application logic.
-- Enforces a clear dependency rule: inner layers never reference outer layers.
+- **Testability**: Domain and business logic must be unit-testable without infrastructure dependencies (databases, message brokers, HTTP clients).
+- **Independent deployability**: Changes to persistence or messaging technology should not ripple into business rules.
+- **Onboarding velocity**: New engineers need a consistent, well-documented structure to navigate unfamiliar services quickly.
+- **Technology evolution**: The platform must accommodate swapping infrastructure components (e.g., migrating from SQL Server to PostgreSQL, or RabbitMQ to AWS SNS/SQS) without rewriting domain or application code.
 
-The CFDI generation domain is complex — it involves tax rules, SAT catalog validation, XML serialization, and cryptographic signing. Mixing these concerns into a single layer would make the system brittle and difficult to evolve.
+Traditional layered architectures (UI → Business → Data) create tight coupling between business logic and data access, making it expensive to change either in isolation.
 
 ## Decision
 
-Adopt **Clean Architecture** (also known as Onion Architecture) with four layers:
+We adopt **Clean Architecture** (Robert C. Martin) as the structural foundation for all backend services, realized as a four-project structure per service:
 
-```
-McpCfdi.Domain          → Entities, Value Objects, Domain Events, Interfaces
-McpCfdi.Application     → Commands, Queries, Handlers, DTOs, Pipeline Behaviours
-McpCfdi.Infrastructure  → EF Core, MassTransit, HTTP Clients, XML/Crypto Services
-McpCfdi.Api             → Minimal API Endpoints, MCP Tools, Middleware, Composition Root
-```
+1. **{SolutionName}.Domain** — Aggregates, entities, value objects, domain events, repository interfaces. Zero external NuGet dependencies. The innermost layer that defines the ubiquitous language.
+2. **{SolutionName}.Application** — CQRS command/query handlers (MediatR), pipeline behaviours (validation, logging), DTOs, and application-level abstractions (`IApplicationEventPublisher`). Depends only on Domain.
+3. **{SolutionName}.Infrastructure** — EF Core persistence, MassTransit messaging, HTTP clients, caching decorators, and all external I/O. Implements interfaces defined in Domain and Application. Depends on Domain and Application.
+4. **{SolutionName}.Api** — ASP.NET Core Minimal API endpoints, middleware (exception handling), authentication/authorization configuration, and the composition root (`Program.cs`). Depends on all inner layers.
 
-**Dependency rule**: Domain ← Application ← Infrastructure ← Api. Inner layers define interfaces; outer layers provide implementations.
+The **dependency rule** is strictly enforced: dependencies point inward only. Domain has no knowledge of Application, Infrastructure, or Api. Application has no knowledge of Infrastructure or Api. This is validated at build time via NetArchTest architecture tests in `{SolutionName}.Architecture.Tests`.
 
 ## Consequences
 
 ### Positive
 
-- Domain has zero external NuGet dependencies — it is a pure .NET class library.
-- Application layer depends only on Domain and lightweight abstractions (MediatR, FluentValidation, logging abstractions).
-- Infrastructure implements all domain/application interfaces (repositories, event publishers, serializers).
-- The Api project acts as Composition Root, wiring all services via DI.
-- Architecture fitness tests (`McpCfdi.Architecture.Tests`) enforce dependency rules at build time.
+- **Domain isolation**: Domain logic is pure C# with no framework dependencies, enabling fast, deterministic unit tests without mocks or test doubles.
+- **Substitutability**: Infrastructure implementations (repositories, publishers, HTTP clients) can be swapped by changing DI registrations without touching business rules.
+- **Parallel development**: Teams can work on Domain, Application, and Infrastructure independently with clearly defined contracts at layer boundaries.
+- **Architecture enforcement**: NetArchTest rules (Property 1) run on every CI build, preventing accidental dependency violations from being merged.
 
 ### Negative
 
-- More projects and indirection compared to a layered monolith.
-- New developers need to understand the dependency rule to place code correctly.
-- Mapping between layers (DTOs ↔ Domain models) adds boilerplate.
-
-### Mitigations
-
-- `Directory.Build.props` enforces shared settings (nullable, warnings as errors) across all projects.
-- Architecture tests prevent accidental dependency violations.
+- **Indirection overhead**: Simple CRUD operations still traverse multiple layers (endpoint → handler → repository), which adds ceremony for trivial features.
+- **Initial learning curve**: Engineers unfamiliar with Clean Architecture require onboarding to understand the layer separation and where to place new code.
+- **Project proliferation**: Each service produces four source projects plus up to five test projects, increasing solution complexity.

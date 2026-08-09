@@ -1,5 +1,6 @@
 ---
-inclusion: auto
+inclusion: fileMatch
+fileMatchPattern: "frontend/**"
 ---
 
 # React Feature Module
@@ -36,22 +37,22 @@ export * from './types';
 Define all feature-specific interfaces:
 
 ```typescript
-export interface OrderLineDto {
+export interface {Entity}LineDto {
   productId: string;
   quantity: number;
   unitPrice: number;
   currency: string;
 }
 
-export interface OrderDto {
+export interface {Entity}Dto {
   id: string;
   customerId: string;
   status: string;
-  lines: OrderLineDto[];
+  lines: {Entity}LineDto[];
   total: { amount: number; currency: string };
 }
 
-export interface PlaceOrderRequest {
+export interface Place{Entity}Request {
   customerId: string;
   lines: { productId: string; quantity: number; unitPrice: number; currency: string }[];
 }
@@ -62,22 +63,22 @@ export interface PlaceOrderRequest {
 ```typescript
 import { useQuery, useMutation } from '@tanstack/react-query';
 import http from '../../../lib/http';
-import type { OrderDto, PlaceOrderRequest } from '../types';
+import type { {Entity}Dto, Place{Entity}Request } from '../types';
 
-export function useOrder(id: string) {
-  return useQuery<OrderDto>({
-    queryKey: ['orders', id],
+export function use{Entity}(id: string) {
+  return useQuery<{Entity}Dto>({
+    queryKey: ['{entities}', id],
     queryFn: async () => {
-      const response = await http.get<OrderDto>(`/orders/${id}`);
+      const response = await http.get<{Entity}Dto>(`/{entities}/${id}`);
       return response.data;
     },
   });
 }
 
-export function usePlaceOrder() {
-  return useMutation<OrderDto, Error, PlaceOrderRequest>({
-    mutationFn: async (request: PlaceOrderRequest) => {
-      const response = await http.post<OrderDto>('/orders', request);
+export function usePlace{Entity}() {
+  return useMutation<{Entity}Dto, Error, Place{Entity}Request>({
+    mutationFn: async (request: Place{Entity}Request) => {
+      const response = await http.post<{Entity}Dto>('/{entities}', request);
       return response.data;
     },
   });
@@ -94,11 +95,11 @@ Rules:
 
 ```tsx
 import { type FormEvent, useState } from 'react';
-import { usePlaceOrder } from '../api';
-import type { PlaceOrderRequest } from '../types';
+import { usePlace{Entity} } from '../api';
+import type { Place{Entity}Request } from '../types';
 
-export function PlaceOrderForm() {
-  const mutation = usePlaceOrder();
+export function Place{Entity}Form() {
+  const mutation = usePlace{Entity}();
   // ... state and handlers
 
   return (
@@ -150,9 +151,51 @@ Rules:
 
 ## Shared Libraries (`frontend/src/lib/`)
 
-- `http.ts` — Axios instance with base URL `/api` and auth token interceptor
+- `http.ts` — Axios instance with base URL from `VITE_API_BASE_URL` (default `/api`), auth token interceptor, 401 redirect to `/login`, network error detection
 - `auth-store.ts` — Global Zustand store for JWT token
 - `index.ts` — Barrel export
+
+## Shared Components (`frontend/src/shared/`)
+
+- `ErrorBoundary` — Class component at app root catching unhandled rendering errors. Displays fallback with `role="alert"` and reload button.
+- `LoadingIndicator` — Renders a spinner with `aria-busy="true"` on the containing element for accessibility.
+
+## Error Handling Patterns
+
+### ProblemDetails Parsing (`useApiError` hook)
+
+```typescript
+import { useApiError } from '@/shared/hooks';
+
+function MyForm() {
+  const { error, fieldErrors, parseError } = useApiError();
+
+  const handleSubmit = async () => {
+    try { await api.post(...); }
+    catch (e) { parseError(e); }
+  };
+
+  return (
+    <>
+      {error && <div role="alert">{error}</div>}
+      {fieldErrors.quantity && <span>{fieldErrors.quantity}</span>}
+    </>
+  );
+}
+```
+
+Rules:
+- Parse `detail` field (or `title` fallback) for general error display
+- Parse `errors` dictionary for per-field validation messages
+- Network errors (no response): display "Unable to reach the server"
+- HTTP 401: clear auth store, redirect to `/login`
+
+### Environment Configuration
+
+The API base URL is configurable per environment:
+- `VITE_API_BASE_URL` env var at build time (via Vite)
+- Default: `/api` (relative path for same-origin via nginx proxy)
+- Frontend Dockerfile accepts `ARG VITE_API_BASE_URL` for Docker builds
 
 ## Tech Stack Reference
 
