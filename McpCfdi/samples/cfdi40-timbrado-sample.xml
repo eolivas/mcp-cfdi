@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CFDI 4.0 timbrado — ejemplo de salida del MCP Tool timbrar_cfdi.
+  
+  Este XML es el resultado exitoso del timbrado ante el PAC. Incluye el nodo
+  tfd:TimbreFiscalDigital como complemento, con UUID, FechaTimbrado, SelloCFD,
+  NoCertificadoSAT, SelloSAT y Version="1.1".
+  
+  NOTA: Los valores aquí son placeholders de ejemplo para documentación y pruebas.
+-->
+<cfdi:Comprobante
+    xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+    xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd"
+    Version="4.0"
+    Fecha="2026-07-22T10:30:00"
+    Sello="GzDrMbKOMFRMI9cHZmWIhEPyqAK3P5EjhD4bMq6k9kOQPZ8R3E5xF8VT2Nf4mQJtX1AIR+a5nFvVxpNnYG3Lh9AGwSdKNdB8o1bFjNXl7oN6FZmspAvCwCVq3K6g4evKwjUxJ0Yd5Cm/EqGFelqqVm8Qx5aNtEHhw3N4gPnWcX1aMkERm+k7x5Hv6fqE8YFn7B=="
+    NoCertificado="30001000000500003416"
+    Certificado="MIIGfDCCBGSgAwIBAgIUMzAwMDEwMDAwMDA1MDAwMDM0MTYwDQYJKoZIhvcNAQELBQAwggErMQ8wDQYDVQQDDAZBQyBVQVQxLjAsBgNVBAoMJVNFUlZJQ0lPIERFIEFETUlOSVNUUkFDSU9OIFRSSUJVVEFSSUExGjAYBgNVBAsMEVNBVC1JRVMgQXV0aG9yaXR5MQ=="
+    FormaPago="01"
+    SubTotal="10000.00"
+    Moneda="MXN"
+    Total="11600.00"
+    TipoDeComprobante="I"
+    MetodoPago="PUE"
+    LugarExpedicion="06600"
+    Exportacion="01">
+
+  <cfdi:Emisor Rfc="EKU9003173C9" Nombre="ESCUELA KEMPER URGATE SA DE CV" RegimenFiscal="601" />
+
+  <cfdi:Receptor Rfc="XAXX010101000" Nombre="PUBLICO EN GENERAL" DomicilioFiscalReceptor="01000" RegimenFiscalReceptor="616" UsoCFDI="S01" />
+
+  <cfdi:Conceptos>
+    <cfdi:Concepto ClaveProdServ="84111506" Cantidad="1.000000" ClaveUnidad="E48" Unidad="Servicio" Descripcion="Servicio de consultoria en tecnologias de la informacion" ValorUnitario="5000.00" Importe="5000.00" ObjetoImp="02">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="5000.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="800.00" />
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>
+    <cfdi:Concepto ClaveProdServ="43232408" Cantidad="2.000000" ClaveUnidad="E48" Unidad="Servicio" Descripcion="Desarrollo de software a la medida" ValorUnitario="2500.00" Importe="5000.00" ObjetoImp="02">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="5000.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="800.00" />
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>
+  </cfdi:Conceptos>
+
+  <cfdi:Impuestos TotalImpuestosTrasladados="1600.00">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="10000.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="1600.00" />
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital
+        xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+        xsi:schemaLocation="http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd"
+        Version="1.1"
+        UUID="A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+        FechaTimbrado="2026-07-22T10:30:15"
+        RfcProvCertif="CVD110412TF6"
+        SelloCFD="GzDrMbKOMFRMI9cHZmWIhEPyqAK3P5EjhD4bMq6k9kOQPZ8R3E5xF8VT2Nf4mQJtX1AIR+a5nFvVxpNnYG3Lh9AGwSdKNdB8o1bFjNXl7oN6FZmspAvCwCVq3K6g4evKwjUxJ0Yd5Cm/EqGFelqqVm8Qx5aNtEHhw3N4gPnWcX1aMkERm+k7x5Hv6fqE8YFn7B=="
+        NoCertificadoSAT="30001000000400002495"
+        SelloSAT="Kp8lN0MxXy7bvLmT2CjxQw5GdFhN3aRm9V+1sBn4Z2cP6yOwU8DxE5FgH7IjK3LqR4StUvW6XzA0BcDeF8GhI9JkLmN1OpQrSt3UvW5XyZaB2cD4eFgHiJkL6mN8oP0qRsT2uVwX4yZ6aBcDeFgH8iJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVw==" />
+  </cfdi:Complemento>
+
+</cfdi:Comprobante>

@@ -13,6 +13,7 @@ using McpCfdi.Domain.Interfaces;
 using McpCfdi.Infrastructure.Catalogs;
 using McpCfdi.Infrastructure.Cryptography;
 using McpCfdi.Infrastructure.Messaging;
+using McpCfdi.Infrastructure.Pac;
 using McpCfdi.Infrastructure.Persistence;
 using McpCfdi.Infrastructure.Xml;
 using Serilog;
@@ -49,6 +50,9 @@ builder.Services.AddScoped<ICfdiSerializer, CfdiXmlSerializer>();
 builder.Services.AddScoped<ICadenaOriginalGenerator, XsltCadenaOriginalGenerator>();
 builder.Services.AddScoped<ISelloDigitalService, RsaSelloDigitalService>();
 builder.Services.AddScoped<ICatalogoSatService, CatalogoSatService>();
+
+// --- PAC Services (timbrado, credenciales emisor) ---
+builder.Services.AddPacServices(builder.Configuration);
 
 // --- MassTransit (InMemory for development) ---
 builder.Services.AddMassTransit(x =>
